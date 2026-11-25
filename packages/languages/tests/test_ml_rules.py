@@ -89,4 +89,3 @@ def test_safe_output_handling_not_flagged(tmp_path: Path, filename: str, line: s
     f = tmp_path / filename
     f.write_text(line + "\n")
     assert not _scan_ml(f).findings
-
