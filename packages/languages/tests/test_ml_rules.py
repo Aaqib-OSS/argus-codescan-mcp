@@ -114,6 +114,7 @@ def test_redos_user_controlled_patterns_flagged(tmp_path: Path, filename: str, s
     ("filename", "source"),
     [
         ("unsafe.py", 're.compile(r"(a+)+$")'),
+        ("unsafe.py", 're.compile(r"A(B|C+)+D")'),
         ("unsafe.py", 're.compile(r"(a|aa)+$")'),
         ("unsafe.py", 're.compile(r"(.*a){5}$")'),
         ("unsafe.py", 're.compile(r"(\\[[^\\[\\]]*\\]|\\s+)+")'),
