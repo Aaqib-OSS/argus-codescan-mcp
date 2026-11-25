@@ -63,6 +63,7 @@ def test_redos_catastrophic_literal_patterns_flagged(
         ("safe.py", 'google_re2.compile(request.args["pattern"])'),
         ("safe.py", 're.compile(r"^\\d{4}-\\d{2}-\\d{2}$")'),
         ("safe.py", 're.compile(r"(cat|dog)+$")'),
+        ("safe.py", 're.compile(r"(a|\\d)+$")'),
         ("safe.js", 'const pattern = new RegExp("^(cat|dog)+$");'),
         ("safe.java", 'Pattern pattern = Pattern.compile("^(cat|dog)+$");'),
         ("safe.js", "const pattern = new RegExp(escapeRegExp(req.query.q));"),
