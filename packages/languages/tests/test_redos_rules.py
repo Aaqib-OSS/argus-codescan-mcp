@@ -6,6 +6,7 @@ import pytest
 
 from argus_languages.scanner import scan_path
 
+
 @pytest.mark.parametrize(
     ("filename", "source"),
     [
@@ -33,7 +34,11 @@ def test_redos_user_controlled_patterns_flagged(tmp_path: Path, filename: str, s
         ("unsafe.py", 're.compile(r"(a|aa)+$")'),
         ("unsafe.py", 're.compile(r"(.*a){5}$")'),
         ("unsafe.py", 're.compile(r"(\\[[^\\[\\]]*\\]|\\s+)+")'),
-        ("unsafe.py", 're.compile(r"^((?:\\d+)?\\.?\\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$", re.I)'),
+        (
+            "unsafe.py",
+            're.compile(r"^((?:\\d+)?\\.?\\d+) *'
+            '(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$", re.I)',
+        ),
         ("unsafe.py", 're.compile(r"(x|x)*$")'),
         ("unsafe.js", 'const pattern = new RegExp("(a+)+$");'),
         ("unsafe.java", 'Pattern pattern = Pattern.compile("(a+)+$");'),
@@ -54,6 +59,7 @@ def test_redos_catastrophic_literal_patterns_flagged(
     [
         ("safe.py", 're.compile(re.escape(request.args["pattern"]))'),
         ("safe.py", 're2.compile(request.args["pattern"])'),
+        ("safe.py", 'google_re2.compile(request.args["pattern"])'),
         ("safe.py", 're.compile(r"^\\d{4}-\\d{2}-\\d{2}$")'),
         ("safe.py", 're.compile(r"(cat|dog)+$")'),
         ("safe.js", 'const pattern = new RegExp("^(cat|dog)+$");'),
