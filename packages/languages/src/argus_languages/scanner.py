@@ -268,6 +268,8 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
         for op, arg in tokens:
             if op == parser.BRANCH:
                 branches = arg[1]
+                if any(not branch for branch in branches):
+                    return True
                 first_sets = [first_chars(branch) for branch in branches]
                 for index, (left_chars, left_wildcard) in enumerate(first_sets):
                     for right_chars, right_wildcard in first_sets[index + 1:]:
