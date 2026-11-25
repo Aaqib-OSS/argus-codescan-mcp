@@ -566,9 +566,18 @@ def _literal_regex_patterns(line: str, language: str) -> list[str]:
 
 def _is_request_pattern(node: ast.AST) -> bool:
     if isinstance(node, ast.Call):
-        return isinstance(node.func, ast.Name) and node.func.id == "input"
+        if isinstance(node.func, ast.Name) and node.func.id == "input":
+            return True
+        return (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr.lower() in {"get", "getlist", "json"}
+            and _is_request_pattern(node.func.value)
+        )
     if isinstance(node, ast.Attribute):
-        if node.attr.lower() in {"query", "body", "params", "args", "form", "get", "post"}:
+        if node.attr.lower() in {
+            "query", "body", "params", "args", "form", "get", "post",
+            "json", "data", "values", "query_params",
+        }:
             return isinstance(node.value, ast.Name) and node.value.id in {"request", "req"}
         return _is_request_pattern(node.value)
     if isinstance(node, ast.Subscript):
@@ -576,7 +585,10 @@ def _is_request_pattern(node: ast.AST) -> bool:
             isinstance(node.value, ast.Attribute)
             and isinstance(node.value.value, ast.Name)
             and node.value.value.id in {"request", "req"}
-            and node.value.attr.lower() in {"args", "query", "form", "get", "post"}
+            and node.value.attr.lower() in {
+                "args", "query", "form", "get", "post", "json", "data", "values",
+                "query_params",
+            }
         )
     return False
 
