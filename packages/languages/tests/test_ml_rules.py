@@ -117,6 +117,8 @@ def test_redos_user_controlled_patterns_flagged(tmp_path: Path, filename: str, s
         ("unsafe.py", 're.compile(r"(a|aa)+$")'),
         ("unsafe.py", 're.compile(r"(.*a){5}$")'),
         ("unsafe.py", 're.compile(r"(x|x)*$")'),
+        ("unsafe.js", 'const pattern = new RegExp("(a+)+$");'),
+        ("unsafe.java", 'Pattern pattern = Pattern.compile("(a+)+$");'),
     ],
 )
 def test_redos_catastrophic_literal_patterns_flagged(
@@ -136,6 +138,8 @@ def test_redos_catastrophic_literal_patterns_flagged(
         ("safe.py", 're2.compile(request.args["pattern"])'),
         ("safe.py", 're.compile(r"^\\d{4}-\\d{2}-\\d{2}$")'),
         ("safe.py", 're.compile(r"(cat|dog)+$")'),
+        ("safe.js", 'const pattern = new RegExp("^(cat|dog)+$");'),
+        ("safe.java", 'Pattern pattern = Pattern.compile("^(cat|dog)+$");'),
         ("safe.js", "const pattern = new RegExp(escapeRegExp(req.query.q));"),
         ("safe.java", 'Pattern.compile(Pattern.quote(request.getParameter("re")));'),
     ],
