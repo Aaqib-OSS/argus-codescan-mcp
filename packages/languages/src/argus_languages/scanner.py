@@ -189,6 +189,241 @@ def _scan_content(
     return findings
 
 
+
+def _regex_pattern_is_dangerous(pattern: str) -> bool:
+    if not pattern or len(pattern) > 2048:
+        return False
+    try:
+        try:
+            import sre_parse as parser
+        except ImportError:
+            from re import _parser as parser
+        parsed = parser.parse(pattern)
+    except (re.error, ValueError, RecursionError):
+        return False
+
+    repeat_ops = {
+        parser.MAX_REPEAT,
+        parser.MIN_REPEAT,
+        getattr(parser, "POSSESSIVE_REPEAT", object()),
+    }
+    unbounded = parser.MAXREPEAT
+
+    def first_chars(tokens):
+        chars = set()
+        wildcard = False
+        for op, arg in tokens:
+            if op is parser.LITERAL:
+                chars.add(chr(arg))
+                return chars, wildcard
+            if op is parser.IN:
+                for item_op, item_arg in arg:
+                    if item_op is parser.LITERAL:
+                        chars.add(chr(item_arg))
+                    elif item_op in {parser.RANGE, parser.CATEGORY, parser.NEGATE}:
+                        wildcard = True
+                return chars, wildcard
+            if op is parser.ANY:
+                return chars, True
+            if op is parser.SUBPATTERN:
+                return first_chars(arg[-1])
+            if op is parser.BRANCH:
+                for branch in arg[1]:
+                    branch_chars, branch_wildcard = first_chars(branch)
+                    chars.update(branch_chars)
+                    wildcard = wildcard or branch_wildcard
+                return chars, wildcard
+            if op in repeat_ops:
+                branch_chars, branch_wildcard = first_chars(arg[2])
+                chars.update(branch_chars)
+                wildcard = wildcard or branch_wildcard
+                return chars, wildcard
+            if op in {parser.AT, getattr(parser, "ASSERT", object()),
+                      getattr(parser, "ASSERT_NOT", object())}:
+                continue
+            return chars, True
+        return chars, wildcard
+
+    def has_overlapping_alternatives(tokens):
+        for op, arg in tokens:
+            if op is parser.BRANCH:
+                branches = arg[1]
+                first_sets = [first_chars(branch) for branch in branches]
+                for index, (left_chars, left_wildcard) in enumerate(first_sets):
+                    for right_chars, right_wildcard in first_sets[index + 1:]:
+                        if (
+                            left_wildcard
+                            or right_wildcard
+                            or left_chars.intersection(right_chars)
+                        ):
+                            return True
+                if any(has_overlapping_alternatives(branch) for branch in branches):
+                    return True
+            elif op is parser.SUBPATTERN and has_overlapping_alternatives(arg[-1]):
+                return True
+            elif op in repeat_ops and has_overlapping_alternatives(arg[2]):
+                return True
+        return False
+
+    def contains_unbounded_repeat(tokens):
+        for op, arg in tokens:
+            if op in repeat_ops:
+                if arg[1] == unbounded or contains_unbounded_repeat(arg[2]):
+                    return True
+            elif op is parser.SUBPATTERN and contains_unbounded_repeat(arg[-1]):
+                return True
+            elif op is parser.BRANCH and any(
+                contains_unbounded_repeat(branch) for branch in arg[1]
+            ):
+                return True
+        return False
+
+    def inspect(tokens):
+        for op, arg in tokens:
+            if op in repeat_ops:
+                maximum, child = arg[1], arg[2]
+                if maximum == unbounded and has_overlapping_alternatives(child):
+                    return True
+                if maximum > 1 and contains_unbounded_repeat(child):
+                    return True
+                if inspect(child):
+                    return True
+            elif op is parser.SUBPATTERN and inspect(arg[-1]):
+                return True
+            elif op is parser.BRANCH and any(inspect(branch) for branch in arg[1]):
+                return True
+        return False
+
+    return inspect(parsed)
+
+
+def _regex_dos_findings(relative: str, language: str, content: str) -> list[Finding]:
+    findings: list[Finding] = []
+    lines = content.splitlines()
+
+    if language == "python":
+        try:
+            tree = ast.parse(content)
+        except (SyntaxError, ValueError, RecursionError, MemoryError):
+            tree = None
+        if tree is not None:
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                    continue
+                owner = node.func.value
+                method = node.func.attr
+                if not isinstance(owner, ast.Name) or owner.id not in {"re", "regex"}:
+                    continue
+                if method not in {"compile", "search", "match", "fullmatch", "findall", "finditer"}:
+                    continue
+                argument = node.args[0] if node.args else next(
+                    (kw.value for kw in node.keywords if kw.arg in {"pattern", "regex"}), None
+                )
+                if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                    if _regex_pattern_is_dangerous(argument.value):
+                        findings.append(
+                            Finding(
+                                title="Potential catastrophic regular expression",
+                                severity=Severity.HIGH,
+                                tool=TOOL_NAME,
+                                file=relative,
+                                line=node.lineno,
+                                rule_id="redos-catastrophic-pattern",
+                                description=f"Language: {language}",
+                                language=language,
+                                confidence="high",
+                                fix_guidance=(
+                                    "Avoid nested unbounded quantifiers and overlapping alternatives. "
+                                    "Rewrite the expression to have predictable matching time or use RE2."
+                                ),
+                            )
+                        )
+                elif argument is not None:
+                    escaped = (
+                        isinstance(argument, ast.Call)
+                        and isinstance(argument.func, ast.Attribute)
+                        and isinstance(argument.func.value, ast.Name)
+                        and argument.func.value.id == "re"
+                        and argument.func.attr == "escape"
+                    )
+                    if escaped:
+                        continue
+                    if _is_request_pattern(argument):
+                        findings.append(
+                            Finding(
+                                title="Regular expression compiled from user-controlled input",
+                                severity=Severity.HIGH,
+                                tool=TOOL_NAME,
+                                file=relative,
+                                line=node.lineno,
+                                rule_id="redos-user-controlled-pattern",
+                                description=f"Language: {language}",
+                                language=language,
+                                confidence="high",
+                                fix_guidance=(
+                                    "Escape user input with re.escape before compiling it, "
+                                    "or use an RE2-compatible engine for untrusted patterns."
+                                ),
+                            )
+                        )
+
+    if language in {"javascript", "typescript"}:
+        dynamic_pattern = re.compile(
+            r"\bnew\s+RegExp\s*\(\s*(?!escapeRegExp\s*\()"
+            r"(?:(?:req|request)\s*\.\s*(?:query|body|params)\b|"
+            r"(?:req|request)\s*\[\s*['\"](?:query|body|params)['\"])",
+            re.IGNORECASE,
+        )
+    elif language == "java":
+        dynamic_pattern = re.compile(
+            r"\bPattern\.compile\s*\(\s*(?!Pattern\.quote\s*\()"
+            r"request\.getParameter\s*\(",
+            re.IGNORECASE,
+        )
+    else:
+        dynamic_pattern = None
+
+    if dynamic_pattern is not None:
+        for line_number, line in enumerate(lines, start=1):
+            if _skip_line(line, language) or not dynamic_pattern.search(line):
+                continue
+            findings.append(
+                Finding(
+                    title="Regular expression compiled from user-controlled input",
+                    severity=Severity.HIGH,
+                    tool=TOOL_NAME,
+                    file=relative,
+                    line=line_number,
+                    rule_id="redos-user-controlled-pattern",
+                    description=f"Language: {language}",
+                    language=language,
+                    confidence="high",
+                    fix_guidance=(
+                        "Escape user input before constructing a regular expression, "
+                        "or use an RE2-compatible engine for untrusted patterns."
+                    ),
+                )
+            )
+
+    return findings
+
+
+def _is_request_pattern(node: ast.AST) -> bool:
+    if isinstance(node, ast.Call):
+        return isinstance(node.func, ast.Name) and node.func.id == "input"
+    if isinstance(node, ast.Attribute):
+        if node.attr.lower() in {"query", "body", "params", "args", "form", "get", "post"}:
+            return isinstance(node.value, ast.Name) and node.value.id in {"request", "req"}
+        return _is_request_pattern(node.value)
+    if isinstance(node, ast.Subscript):
+        return (
+            isinstance(node.value, ast.Attribute)
+            and isinstance(node.value.value, ast.Name)
+            and node.value.value.id in {"request", "req"}
+            and node.value.attr.lower() in {"args", "query", "form", "get", "post"}
+        )
+    return False
+
 def scan_path(target: str | Path, rules: list[LoadedRule] | None = None) -> ScanResult:
     path = Path(target).resolve()
     result = ScanResult(tool=TOOL_NAME, target=str(path))
