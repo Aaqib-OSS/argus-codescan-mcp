@@ -11,6 +11,8 @@ from argus_languages.scanner import scan_path
     ("filename", "source"),
     [
         ("unsafe.py", 're.compile(request.args["pattern"])'),
+        ("unsafe.py", 're.compile(request.args.get("pattern"))'),
+        ("unsafe.py", 're.compile(request.query_params.get("pattern"))'),
         ("unsafe.py", "re.compile(req.query.pattern)"),
         ("unsafe.py", "re.compile(input())"),
         ("unsafe.js", "const pattern = new RegExp(req.query.q);"),
