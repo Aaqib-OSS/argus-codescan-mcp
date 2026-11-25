@@ -105,6 +105,7 @@ def _scan_content(
     content: str,
     rules: list[LoadedRule],
     suppressed: list[dict[str, object]] | None = None,
+    include_regex_analysis: bool = True,
 ) -> list[Finding]:
     findings: list[Finding] = []
     lines = content.splitlines()
@@ -187,7 +188,11 @@ def _scan_content(
                     context=finding_context,
                 )
             )
-    for finding in _regex_dos_findings(relative, language, content):
+    if include_regex_analysis:
+        regex_findings = _regex_dos_findings(relative, language, content)
+    else:
+        regex_findings = []
+    for finding in regex_findings:
         marker = markers[finding.line - 1]
         if marker is not None and marker.covers(finding.rule_id):
             if marker.reason:
@@ -570,7 +575,14 @@ def scan_path(target: str | Path, rules: list[LoadedRule] | None = None) -> Scan
         except OSError:
             continue
         result.findings.extend(
-            _scan_content(scanned.relative, scanned.language, content, loaded, suppressed)
+            _scan_content(
+                scanned.relative,
+                scanned.language,
+                content,
+                loaded,
+                suppressed,
+                include_regex_analysis=rules is None,
+            )
         )
         dependency_findings = scan_dependency_sources(
             scanned.relative, scanned.language, content, loaded
