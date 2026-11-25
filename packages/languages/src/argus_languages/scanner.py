@@ -393,7 +393,7 @@ def _regex_dos_findings(relative: str, language: str, content: str) -> list[Find
                                 confidence="high",
                                 fix_guidance=(
                                     "Avoid nested unbounded quantifiers and overlapping alternatives. "
-                                    "Rewrite the expression to have predictable matching time or use RE2."
+                                    "Rewrite the expression for predictable matching time or use RE2."
                                 ),
                             )
                         )
@@ -445,7 +445,7 @@ def _regex_dos_findings(relative: str, language: str, content: str) -> list[Find
                             confidence="high",
                             fix_guidance=(
                                 "Avoid nested unbounded quantifiers and overlapping alternatives. "
-                                "Rewrite the expression to have predictable matching time or use RE2."
+                                "Rewrite the expression for predictable matching time or use RE2."
                             ),
                         )
                     )
