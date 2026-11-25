@@ -233,21 +233,21 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
         chars = set()
         wildcard = False
         for op, arg in tokens:
-            if op is parser.LITERAL:
+            if op == parser.LITERAL:
                 chars.add(chr(arg))
                 return chars, wildcard
-            if op is parser.IN:
+            if op == parser.IN:
                 for item_op, item_arg in arg:
-                    if item_op is parser.LITERAL:
+                    if item_op == parser.LITERAL:
                         chars.add(chr(item_arg))
                     elif item_op in {parser.RANGE, parser.CATEGORY, parser.NEGATE}:
                         wildcard = True
                 return chars, wildcard
-            if op is parser.ANY:
+            if op == parser.ANY:
                 return chars, True
-            if op is parser.SUBPATTERN:
+            if op == parser.SUBPATTERN:
                 return first_chars(arg[-1])
-            if op is parser.BRANCH:
+            if op == parser.BRANCH:
                 for branch in arg[1]:
                     branch_chars, branch_wildcard = first_chars(branch)
                     chars.update(branch_chars)
@@ -266,7 +266,7 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
 
     def has_overlapping_alternatives(tokens):
         for op, arg in tokens:
-            if op is parser.BRANCH:
+            if op == parser.BRANCH:
                 branches = arg[1]
                 first_sets = [first_chars(branch) for branch in branches]
                 for index, (left_chars, left_wildcard) in enumerate(first_sets):
@@ -279,7 +279,7 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
                             return True
                 if any(has_overlapping_alternatives(branch) for branch in branches):
                     return True
-            elif op is parser.SUBPATTERN and has_overlapping_alternatives(arg[-1]):
+            elif op == parser.SUBPATTERN and has_overlapping_alternatives(arg[-1]):
                 return True
             elif op in repeat_ops and has_overlapping_alternatives(arg[2]):
                 return True
@@ -290,9 +290,9 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
             if op in repeat_ops:
                 if arg[1] == unbounded or contains_unbounded_repeat(arg[2]):
                     return True
-            elif op is parser.SUBPATTERN and contains_unbounded_repeat(arg[-1]):
+            elif op == parser.SUBPATTERN and contains_unbounded_repeat(arg[-1]):
                 return True
-            elif op is parser.BRANCH and any(
+            elif op == parser.BRANCH and any(
                 contains_unbounded_repeat(branch) for branch in arg[1]
             ):
                 return True
@@ -308,9 +308,9 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
                     return True
                 if inspect(child):
                     return True
-            elif op is parser.SUBPATTERN and inspect(arg[-1]):
+            elif op == parser.SUBPATTERN and inspect(arg[-1]):
                 return True
-            elif op is parser.BRANCH and any(inspect(branch) for branch in arg[1]):
+            elif op == parser.BRANCH and any(inspect(branch) for branch in arg[1]):
                 return True
         return False
 
