@@ -389,6 +389,30 @@ def _regex_dos_findings(relative: str, language: str, content: str) -> list[Find
                             )
                         )
 
+    if language in {"javascript", "typescript", "java"}:
+        for line_number, line in enumerate(lines, start=1):
+            if _skip_line(line, language):
+                continue
+            for literal in _literal_regex_patterns(line, language):
+                if _regex_pattern_is_dangerous(literal):
+                    findings.append(
+                        Finding(
+                            title="Potential catastrophic regular expression",
+                            severity=Severity.HIGH,
+                            tool=TOOL_NAME,
+                            file=relative,
+                            line=line_number,
+                            rule_id="redos-catastrophic-pattern",
+                            description=f"Language: {language}",
+                            language=language,
+                            confidence="high",
+                            fix_guidance=(
+                                "Avoid nested unbounded quantifiers and overlapping alternatives. "
+                                "Rewrite the expression to have predictable matching time or use RE2."
+                            ),
+                        )
+                    )
+
     if language in {"javascript", "typescript"}:
         dynamic_pattern = re.compile(
             r"\bnew\s+RegExp\s*\(\s*(?!escapeRegExp\s*\()"
@@ -429,6 +453,44 @@ def _regex_dos_findings(relative: str, language: str, content: str) -> list[Find
 
     return findings
 
+
+
+def _literal_regex_patterns(line: str, language: str) -> list[str]:
+    if language in {"javascript", "typescript"}:
+        calls = re.compile(r"\bnew\s+RegExp\s*\(")
+    elif language == "java":
+        calls = re.compile(r"\bPattern\.compile\s*\(")
+    else:
+        return []
+
+    patterns = []
+    for match in calls.finditer(line):
+        position = match.end()
+        while position < len(line) and line[position].isspace():
+            position += 1
+        if position >= len(line) or line[position] not in {"'", '"'}:
+            continue
+        quote = line[position]
+        end = position + 1
+        escaped = False
+        while end < len(line):
+            character = line[end]
+            if character == quote and not escaped:
+                break
+            if character == "\\" and not escaped:
+                escaped = True
+            else:
+                escaped = False
+            end += 1
+        if end >= len(line):
+            continue
+        try:
+            value = ast.literal_eval(line[position:end + 1])
+        except (SyntaxError, ValueError):
+            continue
+        if isinstance(value, str):
+            patterns.append(value)
+    return patterns
 
 def _is_request_pattern(node: ast.AST) -> bool:
     if isinstance(node, ast.Call):
