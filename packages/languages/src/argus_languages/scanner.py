@@ -224,7 +224,7 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
         except ImportError:
             from re import _parser as parser
         parsed = parser.parse(pattern)
-    except (re.error, ValueError, RecursionError):
+    except (re.error, ValueError, RecursionError, OverflowError):
         return False
 
     repeat_ops = {
@@ -233,6 +233,15 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
         getattr(parser, "POSSESSIVE_REPEAT", object()),
     }
     unbounded = parser.MAXREPEAT
+
+    def category_characters(category):
+        if category == parser.CATEGORY_DIGIT:
+            return set("0123456789")
+        if category == parser.CATEGORY_SPACE:
+            return set(" \\t\\n\\r\\f\\v")
+        if category == parser.CATEGORY_WORD:
+            return set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+        return None
 
     def first_chars(tokens):
         chars = set()
@@ -245,9 +254,26 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
                 for item_op, item_arg in arg:
                     if item_op == parser.LITERAL:
                         chars.add(chr(item_arg))
-                    elif item_op in {parser.RANGE, parser.CATEGORY, parser.NEGATE}:
+                    elif item_op == parser.RANGE:
+                        start, end = item_arg
+                        if end - start <= 256:
+                            chars.update(chr(value) for value in range(start, end + 1))
+                        else:
+                            wildcard = True
+                    elif item_op == parser.CATEGORY:
+                        category = category_characters(item_arg)
+                        if category is None:
+                            wildcard = True
+                        else:
+                            chars.update(category)
+                    elif item_op == parser.NEGATE:
                         wildcard = True
                 return chars, wildcard
+            if op == parser.CATEGORY:
+                category = category_characters(arg)
+                if category is None:
+                    return chars, True
+                return category, False
             if op == parser.ANY:
                 return chars, True
             if op == parser.SUBPATTERN:
@@ -358,7 +384,10 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
                 return True
         return False
 
-    return inspect(parsed)
+    try:
+        return inspect(parsed)
+    except RecursionError:
+        return False
 
 
 def _regex_dos_findings(relative: str, language: str, content: str) -> list[Finding]:
