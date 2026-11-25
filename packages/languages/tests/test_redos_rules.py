@@ -37,7 +37,8 @@ def test_redos_user_controlled_patterns_flagged(tmp_path: Path, filename: str, s
         (
             "unsafe.py",
             're.compile(r"^((?:\\d+)?\\.?\\d+) *'
-            '(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$", re.I)',
+            '(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|'
+            'days?|d|years?|yrs?|y)?$", re.I)',
         ),
         ("unsafe.py", 're.compile(r"(x|x)*$")'),
         ("unsafe.js", 'const pattern = new RegExp("(a+)+$");'),
