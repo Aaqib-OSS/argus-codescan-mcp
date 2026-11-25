@@ -116,6 +116,7 @@ def test_redos_user_controlled_patterns_flagged(tmp_path: Path, filename: str, s
         ("unsafe.py", 're.compile(r"(a+)+$")'),
         ("unsafe.py", 're.compile(r"(a|aa)+$")'),
         ("unsafe.py", 're.compile(r"(.*a){5}$")'),
+        ("unsafe.py", 're.compile(r"(\\[[^\\[\\]]*\\]|\\s+)+")'),
         ("unsafe.py", 're.compile(r"(x|x)*$")'),
         ("unsafe.js", 'const pattern = new RegExp("(a+)+$");'),
         ("unsafe.java", 'Pattern pattern = Pattern.compile("(a+)+$");'),
