@@ -174,7 +174,7 @@
 - id: ml-openai-anthropic-unbounded-output
   title: LLM request omits its maximum output-token limit
   severity: medium
-  pattern: '(?:chat\\.completions|responses|messages)\\.create\\s*\\((?:(?!\\b(?:max_tokens|max_output_tokens|max_completion_tokens)\\s*[:=])[\\s\\S]){0,3000}?\\)'
+  pattern: '(?:chat\.completions|responses|messages)\.create\s*\((?:(?!\b(?:max_tokens|max_output_tokens|max_completion_tokens)\s*[:=])[\s\S]){0,3000}?\)'
   flags: [i]
   multiline: true
   languages: [python, javascript, typescript]
@@ -186,7 +186,7 @@
 - id: ml-gemini-unbounded-output
   title: Gemini generation omits max_output_tokens
   severity: medium
-  pattern: 'generate_content\\s*\\((?:(?!\\bmax_output_tokens\\s*[:=])[\\s\\S]){0,3000}?\\)'
+  pattern: 'generate_content\s*\((?:(?!\bmax_output_tokens\s*[:=])[\s\S]){0,3000}?\)'
   flags: [i]
   multiline: true
   languages: [python, javascript, typescript]
@@ -197,7 +197,7 @@
 - id: ml-mistral-unbounded-output
   title: Mistral request omits its maximum output-token limit
   severity: medium
-  pattern: 'chat\\.(?:complete|stream)\\s*\\((?:(?!\\bmax_tokens\\s*[:=])[\\s\\S]){0,3000}?\\)'
+  pattern: 'chat\.(?:complete|stream)\s*\((?:(?!\bmax_tokens\s*[:=])[\s\S]){0,3000}?\)'
   flags: [i]
   multiline: true
   languages: [python, javascript, typescript]
@@ -206,7 +206,7 @@
 - id: ml-litellm-unbounded-output
   title: LiteLLM request omits its maximum output-token limit
   severity: medium
-  pattern: '(?:litellm\\.)?(?:completion|acompletion)\\s*\\((?:(?!\\bmax_tokens\\s*[:=])[\\s\\S]){0,3000}?\\)'
+  pattern: '(?:litellm\.)?(?:completion|acompletion)\s*\((?:(?!\bmax_tokens\s*[:=])[\s\S]){0,3000}?\)'
   flags: [i]
   multiline: true
   languages: [python, javascript, typescript]
@@ -215,7 +215,7 @@
 - id: ml-langchain-unbounded-output
   title: LangChain chat model is created without an output-token limit
   severity: medium
-  pattern: 'Chat(?:OpenAI|Anthropic|GoogleGenerativeAI|MistralAI)\\s*\\((?:(?!\\b(?:max_tokens|max_output_tokens|max_completion_tokens)\\s*[:=])[\\s\\S]){0,2000}?\\)'
+  pattern: 'Chat(?:OpenAI|Anthropic|GoogleGenerativeAI|MistralAI)\s*\((?:(?!\b(?:max_tokens|max_output_tokens|max_completion_tokens)\s*[:=])[\s\S]){0,2000}?\)'
   flags: [i]
   multiline: true
   languages: [python, javascript, typescript]
@@ -225,7 +225,7 @@
   title: LLM output-token limit exceeds 16,000 tokens
   severity: low
   confidence: low
-  pattern: '\\b(?:max_tokens|max_output_tokens|max_completion_tokens)\\s*[:=]\\s*(?:1[6-9]\\d{3}|[2-9]\\d{4,})\\b'
+  pattern: '\b(?:max_tokens|max_output_tokens|max_completion_tokens)\s*[:=]\s*(?:1[6-9]\d{3}|[2-9]\d{4,})\b'
   flags: [i]
   languages: [python, javascript, typescript]
   fix_guidance: Review whether this output budget is necessary and lower it to the smallest value the feature requires.
@@ -233,7 +233,7 @@
 - id: ml-llm-model-or-history-from-request
   title: LLM model or message history is taken directly from an HTTP request
   severity: high
-  pattern: '\\b(?:model|messages)\\s*[:=]\\s*(?:request\\.(?:json|body|args|query)|req\\.(?:body|query)|body(?:\\.|\\[))'
+  pattern: '\b(?:model|messages)\s*[:=]\s*(?:request\.(?:json|body|args|query)|req\.(?:body|query)|body(?:\.|\[))'
   flags: [i]
   languages: [python, javascript, typescript]
   fix_guidance: >-
@@ -244,7 +244,7 @@
   title: LLM request has no visible timeout
   severity: low
   confidence: low
-  pattern: '(?:chat\\.completions|responses|messages)\\.create\\s*\\((?:(?!\\btimeout\\s*[:=])[\\s\\S]){0,3000}?\\)'
+  pattern: '(?:chat\.completions|responses|messages)\.create\s*\((?:(?!\btimeout\s*[:=])[\s\S]){0,3000}?\)'
   flags: [i]
   multiline: true
   languages: [python, javascript, typescript]
@@ -256,7 +256,7 @@
   title: Request handler calls an LLM without an evident rate limiter
   severity: high
   confidence: medium
-  pattern: '(?is)\\A(?=[\\s\\S]*\\b(?:app|router)\\.(?:get|post|put|patch|delete)\\s*\\()(?=[\\s\\S]*\\b(?:chat\\.completions|responses|messages|generate_content|chat\\.complete|completion|acompletion)(?:\\.create)?\\s*\\()(?!(?s:[\\s\\S]*(?:rate_limit|rateLimit|RateLimiter|throttl|slowapi|express-rate-limit|limiter\\.limit)))[\\s\\S]+'
+  pattern: '(?is)\A(?=[\s\S]*\b(?:app|router)\.(?:get|post|put|patch|delete)\s*\()(?=[\s\S]*\b(?:chat\.completions|responses|messages|generate_content|chat\.complete|completion|acompletion)(?:\.create)?\s*\()(?!(?s:[\s\S]*(?:rate_limit|rateLimit|RateLimiter|throttl|slowapi|express-rate-limit|limiter\.limit)))[\s\S]+'
   multiline: true
   languages: [python, javascript, typescript]
   fix_guidance: >-
