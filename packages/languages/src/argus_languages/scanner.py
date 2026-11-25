@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from bisect import bisect_right
 from pathlib import Path
 
@@ -186,6 +187,25 @@ def _scan_content(
                     context=finding_context,
                 )
             )
+    for finding in _regex_dos_findings(relative, language, content):
+        marker = markers[finding.line - 1]
+        if marker is not None and marker.covers(finding.rule_id):
+            if marker.reason:
+                if suppressed is not None:
+                    suppressed.append(
+                        {
+                            "rule_id": finding.rule_id,
+                            "file": relative,
+                            "line": finding.line,
+                            "reason": marker.reason,
+                        }
+                    )
+                continue
+            finding.description += _IGNORE_HINT.format(rule=finding.rule_id)
+        if context:
+            finding.severity = downgrade(finding.severity)
+            finding.context = context
+        findings.append(finding)
     return findings
 
 
