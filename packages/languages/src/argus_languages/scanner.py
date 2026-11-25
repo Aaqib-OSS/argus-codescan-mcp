@@ -300,7 +300,44 @@ def _regex_pattern_is_dangerous(pattern: str) -> bool:
                 return True
         return False
 
+    def nullable(op, arg):
+        if op in {parser.AT, getattr(parser, "ASSERT", object()),
+                  getattr(parser, "ASSERT_NOT", object())}:
+            return True
+        if op in repeat_ops:
+            return arg[0] == 0 or nullable_sequence(arg[2])
+        if op == parser.SUBPATTERN:
+            return nullable_sequence(arg[-1])
+        if op == parser.BRANCH:
+            return any(nullable_sequence(branch) for branch in arg[1])
+        return False
+
+    def nullable_sequence(tokens):
+        return all(nullable(op, arg) for op, arg in tokens)
+
+    def has_ambiguous_adjacent_repeats(tokens):
+        for index, (op, arg) in enumerate(tokens):
+            if op not in repeat_ops or not contains_unbounded_repeat(arg[2]):
+                continue
+            left_chars, left_wildcard = first_chars(arg[2])
+            for next_op, next_arg in tokens[index + 1:]:
+                if nullable(next_op, next_arg):
+                    continue
+                if next_op not in repeat_ops:
+                    break
+                right_chars, right_wildcard = first_chars(next_arg[2])
+                if (
+                    left_wildcard
+                    or right_wildcard
+                    or left_chars.intersection(right_chars)
+                ):
+                    return True
+                break
+        return False
+
     def inspect(tokens):
+        if has_ambiguous_adjacent_repeats(tokens):
+            return True
         for op, arg in tokens:
             if op in repeat_ops:
                 maximum, child = arg[1], arg[2]
